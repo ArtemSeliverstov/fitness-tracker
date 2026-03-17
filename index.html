@@ -670,7 +670,11 @@ const WEEK_PLAN = [
 // ── STORAGE ───────────────────────────────────────────────────────────────────
 
 function loadDataLocal() {
-  try { return JSON.parse(localStorage.getItem('fitness_log') || '{"sessions":[],"bearLogs":{},"weeklyWeights":{}}'); }
+  try {
+    const d = JSON.parse(localStorage.getItem('fitness_log') || '{"sessions":[],"bearLogs":{},"weeklyWeights":{}}');
+    d.bearLogs = normalizeBearLogs(d.bearLogs);
+    return d;
+  }
   catch(e) { return { sessions:[], bearLogs:{}, weeklyWeights:{} }; }
 }
 function saveDataLocal(d) {
@@ -685,14 +689,24 @@ function saveData(d) {
 
 // ── BOOT (called after PIN cleared) ──────────────────────────────────────────
 
+function normalizeBearLogs(bl) {
+  if(!bl) return {};
+  if(Array.isArray(bl)) {
+    const obj = {};
+    bl.forEach((v,i) => { if(v !== null && v !== undefined) obj[String(i)] = v; });
+    return obj;
+  }
+  return bl;
+}
+
 function bootApp() {
   fbPull().then(remote => {
-    if(remote && remote.sessions) {
+    if(remote) {
       const local = loadDataLocal();
       const allSessions = [...local.sessions];
       const localIds = new Set(local.sessions.map(s=>s.id));
-      remote.sessions.forEach(s => { if(!localIds.has(s.id)) allSessions.push(s); });
-      const mergedBear = Object.assign({}, remote.bearLogs||{}, local.bearLogs||{});
+      (remote.sessions||[]).forEach(s => { if(!localIds.has(s.id)) allSessions.push(s); });
+      const mergedBear = Object.assign({}, normalizeBearLogs(remote.bearLogs), local.bearLogs||{});
       const mergedWeights = Object.assign({}, remote.weeklyWeights||{}, local.weeklyWeights||{});
       const merged = { sessions:allSessions, bearLogs:mergedBear, weeklyWeights:mergedWeights };
       saveDataLocal(merged);
